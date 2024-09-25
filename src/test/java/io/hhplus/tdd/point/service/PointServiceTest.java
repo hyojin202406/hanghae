@@ -1,6 +1,5 @@
 package io.hhplus.tdd.point.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.hhplus.tdd.point.domain.PointHistory;
 import io.hhplus.tdd.point.domain.TransactionType;
 import io.hhplus.tdd.point.domain.UserPoint;
@@ -8,14 +7,13 @@ import io.hhplus.tdd.point.exception.InvalidUserIdException;
 import io.hhplus.tdd.point.exception.PointValidationException;
 import io.hhplus.tdd.point.exception.UserPointNotFoundException;
 import io.hhplus.tdd.point.repository.PointRepository;
+import io.hhplus.tdd.point.util.PointPolicy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Arrays;
 import java.util.List;
@@ -28,17 +26,14 @@ import static org.mockito.Mockito.*;
 @WebMvcTest(PointServiceTest.class)
 class PointServiceTest {
 
-    @Autowired
-    MockMvc mockMvc;
-
     @Mock
     private PointRepository pointRepository;
 
     @InjectMocks
     PointService pointService;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    @Mock
+    private PointPolicy pointPolicy;
 
     @Nested
     @DisplayName("[point] 유저 포인트 조회 테스트")
@@ -115,24 +110,6 @@ class PointServiceTest {
             assertEquals(2, result.size());
             assertEquals(mockHistory.get(0).amount(), result.get(0).amount());
             verify(pointRepository, times(1)).getUserHistory(validId);
-        }
-    }
-
-    @Nested
-    @DisplayName("[chargeUserPoint] 유저 포인트 충전/이용 내역 조회 테스트")
-    class ChargeUserPointTest {
-        @Test
-        void invalidUserId() throws Exception {
-            // Given
-            long invalidId = -1L;
-
-            // When & Then
-            InvalidUserIdException exception = assertThrows(InvalidUserIdException.class, () -> {
-                pointService.getUserPoint(invalidId);
-            });
-
-            assertEquals("Invalid user ID: " + invalidId, exception.getMessage());
-            verify(pointRepository, never()).getUserHistory(anyLong());
         }
     }
 
@@ -235,16 +212,23 @@ class PointServiceTest {
         @DisplayName("[use] 유저 포인트가 유효하지 않을 경우 예외 처리")
         @Test
         void invalidUserPoint() throws Exception {
-            // Givne
+            // Given
             long validId = 1L;
             long invalidAmount = -1000L;
+
+            // 포인트 충전 유효성 검증에 대한 Mock 설정
+            doThrow(new PointValidationException("충전할 수 없는 금액입니다: " + invalidAmount))
+                    .when(pointPolicy).validatePointCharge(invalidAmount);
 
             // When & Then
             PointValidationException exception = assertThrows(PointValidationException.class, () -> {
                 pointService.chargeUserPoint(validId, invalidAmount);
             });
 
-            assertEquals("Point validation exception. amount : " + invalidAmount, exception.getMessage());
+            // 예외 메시지 검증
+            assertEquals("충전할 수 없는 금액입니다: " + invalidAmount, exception.getMessage());
+
+            // pointRepository의 insertOrUpdate 메서드가 호출되지 않았는지 검증
             verify(pointRepository, never()).insertOrUpdate(anyLong(), anyLong());
         }
 
@@ -282,7 +266,7 @@ class PointServiceTest {
                 pointService.useUserPoint(validId, requestAmount);
             });
 
-            assertEquals("Point validation exception. remainingBalance : " + (500L - requestAmount), exception.getMessage());
+            assertEquals("Point validation exception. remainingPoint : " + (500L - requestAmount), exception.getMessage());
             verify(pointRepository, never()).insertOrUpdate(anyLong(), anyLong());
         }
 
@@ -298,6 +282,9 @@ class PointServiceTest {
             // 유저의 현재 포인트 설정
             UserPoint currentUserPoint = new UserPoint(validId, currentAmount, System.currentTimeMillis());
             when(pointRepository.getUserPoint(validId)).thenReturn(currentUserPoint);
+
+            // 포인트 사용 유효성 검증 Mock 설정
+            pointPolicy.validatePointUsage(currentUserPoint, useAmount);  // 정상적인 사용을 위한 유효성 검증 호출
 
             // 포인트 사용 후 업데이트된 포인트 설정
             UserPoint updatedUserPoint = new UserPoint(validId, updatedAmount, System.currentTimeMillis());
