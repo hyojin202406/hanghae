@@ -138,12 +138,16 @@ class PointServiceTest {
             long validId = 1L;
             long invalidAmount = -1000L;
 
+            // 포인트 충전 유효성 검증에 대한 Mock 설정
+            doThrow(new PointValidationException("Point validation exception. amount: " + invalidAmount))
+                    .when(pointPolicy).validatePointCharge(invalidAmount);
+
             // When & Then
             PointValidationException exception = assertThrows(PointValidationException.class, () -> {
                 pointService.chargeUserPoint(validId, invalidAmount);
             });
 
-            assertEquals("Point validation exception. amount : " + invalidAmount, exception.getMessage());
+            assertEquals("Point validation exception. amount: " + invalidAmount, exception.getMessage());
             verify(pointRepository, never()).insertOrUpdate(anyLong(), anyLong());
         }
 
@@ -217,7 +221,7 @@ class PointServiceTest {
             long invalidAmount = -1000L;
 
             // 포인트 충전 유효성 검증에 대한 Mock 설정
-            doThrow(new PointValidationException("충전할 수 없는 금액입니다: " + invalidAmount))
+            doThrow(new PointValidationException("Point validation exception. amount: " + invalidAmount))
                     .when(pointPolicy).validatePointCharge(invalidAmount);
 
             // When & Then
@@ -226,7 +230,7 @@ class PointServiceTest {
             });
 
             // 예외 메시지 검증
-            assertEquals("충전할 수 없는 금액입니다: " + invalidAmount, exception.getMessage());
+            assertEquals("Point validation exception. amount: " + invalidAmount, exception.getMessage());
 
             // pointRepository의 insertOrUpdate 메서드가 호출되지 않았는지 검증
             verify(pointRepository, never()).insertOrUpdate(anyLong(), anyLong());
@@ -256,17 +260,22 @@ class PointServiceTest {
             // Given
             long validId = 1L;
             long requestAmount = 1000L;
+            long remainingPoint = 500L - 1000L;
 
             // 유저의 현재 포인트는 500으로 설정
             UserPoint currentUserPoint = new UserPoint(validId, 500L, System.currentTimeMillis());
             when(pointRepository.getUserPoint(validId)).thenReturn(currentUserPoint);
+
+            // 포인트 충전 유효성 검증에 대한 Mock 설정
+            doThrow(new PointValidationException("Insufficient balance: attempted to use: " + requestAmount + ", remaining balance: " + remainingPoint))
+                    .when(pointPolicy).validatePointUsage(currentUserPoint, requestAmount);
 
             // When & Then
             PointValidationException exception = assertThrows(PointValidationException.class, () -> {
                 pointService.useUserPoint(validId, requestAmount);
             });
 
-            assertEquals("Point validation exception. remainingPoint : " + (500L - requestAmount), exception.getMessage());
+            assertEquals("Insufficient balance: attempted to use: " + requestAmount + ", remaining balance: " + remainingPoint, exception.getMessage());
             verify(pointRepository, never()).insertOrUpdate(anyLong(), anyLong());
         }
 

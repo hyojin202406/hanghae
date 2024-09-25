@@ -7,30 +7,29 @@ import org.springframework.stereotype.Component;
 @Component
 public class PointPolicy {
 
-    private static final long MAX_POINT_BALANCE = 10000; // 최대 잔고 예시
+    private static final long MAX_POINT_BALANCE = 10000; // Example maximum balance
 
     public void validatePointCharge(long amount) {
         if (amount < 0) {
-            throw new PointValidationException("충전할 수 없는 금액입니다: " + amount);
+            throw new PointValidationException("Invalid charge amount: " + amount);
         }
     }
 
     public void validatePointUsage(UserPoint userPoint, long amount) {
         if (amount < 0) {
-            throw new PointValidationException("사용할 수 없는 금액입니다: " + amount);
+            throw new PointValidationException("Invalid usage amount: " + amount);
         }
 
         long remainingPoint = userPoint.point() - amount;
 
         if (remainingPoint < 0) {
-            throw new PointValidationException("잔고 부족: 사용하려는 포인트: " + amount + ", 잔여 포인트: " + remainingPoint);
+            throw new PointValidationException("Insufficient balance: attempted to use: " + amount + ", remaining balance: " + remainingPoint);
         }
     }
 
     public void validateMaxBalance(UserPoint userPoint) {
         if (userPoint.point() > MAX_POINT_BALANCE) {
-            throw new PointValidationException("최대 잔고를 초과하였습니다: " + userPoint.point());
+            throw new PointValidationException("Exceeded maximum balance: " + userPoint.point());
         }
     }
-
 }
