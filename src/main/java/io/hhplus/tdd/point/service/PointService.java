@@ -1,13 +1,12 @@
 package io.hhplus.tdd.point.service;
 
-import io.hhplus.tdd.point.controller.PointController;
 import io.hhplus.tdd.point.domain.PointHistory;
 import io.hhplus.tdd.point.domain.TransactionType;
 import io.hhplus.tdd.point.domain.UserPoint;
 import io.hhplus.tdd.point.exception.InvalidUserIdException;
-import io.hhplus.tdd.point.exception.PointValidationException;
 import io.hhplus.tdd.point.exception.UserPointNotFoundException;
 import io.hhplus.tdd.point.repository.PointRepository;
+import io.hhplus.tdd.point.util.PointPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -20,9 +19,11 @@ public class PointService {
     private static final Logger log = LoggerFactory.getLogger(PointService.class);
 
     private final PointRepository pointRepository;
+    private final PointPolicy pointPolicy;
 
-    public PointService(PointRepository pointRepository) {
+    public PointService(PointRepository pointRepository, PointPolicy pointPolicy) {
         this.pointRepository = pointRepository;
+        this.pointPolicy = pointPolicy;
     }
 
     /**
@@ -65,14 +66,14 @@ public class PointService {
             throw new InvalidUserIdException("Invalid user ID: " + id);
         }
 
-        // 유효하지 않은 포인트 처리
-        if (amount < 0) {
-            throw new PointValidationException("Point validation exception. amount : " + amount);
-        }
+        // 포인트 충전 유효성 검사
+        pointPolicy.validatePointCharge(amount);
 
         // 유저 포인트 충전
         UserPoint updatedUserPoint = pointRepository.insertOrUpdate(id, amount);
-        log.debug("insertOrUpdate가 호출되었습니다.");
+
+        // 최대 잔고 검사
+        pointPolicy.validateMaxBalance(updatedUserPoint);
 
         // 유저 포인트 충전 내역 저장
         pointRepository.insertHistory(id,
@@ -80,7 +81,6 @@ public class PointService {
                 TransactionType.CHARGE,
                 updatedUserPoint.updateMillis());
 
-        // 변경된 유저 정보 전달
         return updatedUserPoint;
     }
 
@@ -96,11 +96,6 @@ public class PointService {
             throw new InvalidUserIdException("Invalid user ID: " + id);
         }
 
-        // 유효하지 않은 포인트 처리
-        if (amount < 0) {
-            throw new PointValidationException("Point validation exception. amount : " + amount);
-        }
-
         // 유저 포인트 조회
         UserPoint currentUserPoint = pointRepository.getUserPoint(id);
 
@@ -109,16 +104,11 @@ public class PointService {
             throw new UserPointNotFoundException("Failed to find user point for ID: " + id);
         }
 
-        // 남은 포인트 계산
-        long remainingPoint = currentUserPoint.point() - amount;
-
-        // 포인트 부족 시 예외 처리
-        if (remainingPoint < 0) {
-            throw new PointValidationException("Point validation exception. remainingPoint : " + remainingPoint);
-        }
+        // 포인트 사용 유효성 검사
+        pointPolicy.validatePointUsage(currentUserPoint, amount);
 
         // 포인트 업데이트 및 변환
-        UserPoint userUpdatedPoint = pointRepository.insertOrUpdate(id, remainingPoint);
+        UserPoint userUpdatedPoint = pointRepository.insertOrUpdate(id, currentUserPoint.point() - amount);
 
         // 포인트 사용 내역 저장
         pointRepository.insertHistory(
@@ -128,7 +118,6 @@ public class PointService {
                 userUpdatedPoint.updateMillis()
         );
 
-        // 업데이트된 포인트 반환
         return userUpdatedPoint;
     }
 
