@@ -1,6 +1,5 @@
-package io.hhplus.tdd.point.service;
+package io.hhplus.tdd.point.domain;
 
-import io.hhplus.tdd.point.domain.*;
 import io.hhplus.tdd.point.exception.InvalidUserIdException;
 import io.hhplus.tdd.point.exception.PointValidationException;
 import org.junit.jupiter.api.BeforeEach;
