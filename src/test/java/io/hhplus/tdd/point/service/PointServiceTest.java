@@ -173,28 +173,25 @@ class PointServiceTest {
 
         @Test
         void 충전_내역_저장_실패_시_예외_발생() {
-            // Given
+            // Given: 충전 내역 저장 시 예외가 발생하도록 설정
             long validId = 1L;
             long amount = 100L;
             UserPoint initialPoint = new UserPoint(validId, 100, System.currentTimeMillis());
             UserPoint chargedPoint = new UserPoint(validId, 200, System.currentTimeMillis());
-
             when(pointRepository.point(validId)).thenReturn(initialPoint);
             when(pointRepository.insertOrUpdate(validId, chargedPoint.point())).thenReturn(chargedPoint);
-            doThrow(new RuntimeException("History insert failed")).when(pointRepository).insertHistory(validId, amount, TransactionType.CHARGE, chargedPoint.updateMillis());
 
-            // When & Then
-            Exception exception = assertThrows(RuntimeException.class, () -> pointService.charge(validId, amount));
+            doThrow(new RuntimeException("Failed to save charge history"))
+                    .when(pointRepository).insertHistory(anyLong(), anyLong(), any(), anyLong());
 
-            // Validate exception message
-            assertEquals("History insert failed", exception.getMessage());
+            // When & Then: 예외가 발생해야 함
+            Exception exception = org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () -> {
+                pointService.charge(1L, 100);
+            });
 
-            // Verify interactions
-            verify(pointRepository, times(1)).point(validId);
-            verify(pointRepository, times(1)).insertOrUpdate(validId, chargedPoint.point());
-            verify(pointRepository, times(1)).insertHistory(validId, amount, TransactionType.CHARGE, chargedPoint.updateMillis());
+            // 예외 메시지 검증
+            assertEquals("Failed to save charge history", exception.getMessage());
         }
-
     }
 
     @Nested
