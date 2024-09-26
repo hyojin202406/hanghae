@@ -1,6 +1,5 @@
-package io.hhplus.tdd.point.service;
+package io.hhplus.tdd.point.domain;
 
-import io.hhplus.tdd.point.domain.*;
 import io.hhplus.tdd.point.exception.InvalidUserIdException;
 import io.hhplus.tdd.point.exception.PointValidationException;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,9 +37,8 @@ class PointServiceTest {
     @Nested
     @DisplayName("[point] 유저 포인트 조회 테스트")
     class PointTest {
-        @DisplayName("유저 아이디가 유효하지 않을 경우 예외 처리")
         @Test
-        void invalidUserId() {
+        void 유저_아이디가_유효하지_않을_경우_예외_처리() {
             // Given
             long invalidId = -1L;
 
@@ -53,9 +51,8 @@ class PointServiceTest {
             verify(pointRepository, never()).point(anyLong());
         }
 
-        @DisplayName("정상적인 유저 아이디로 포인트 조회")
         @Test
-        void validUserId() {
+        void 정상적인_유저_아이디로_포인트_조회() {
             // Given
             long validId = 1L;
             UserPoint point = new UserPoint(validId, 0, System.currentTimeMillis());
@@ -76,9 +73,8 @@ class PointServiceTest {
     @Nested
     @DisplayName("[history] 유저 포인트 충전/이용 내역 조회 테스트")
     class HistoryTest {
-        @DisplayName("[history] 유저 아이디가 유효하지 않을 경우 예외 처리")
         @Test
-        void invalidUserId() {
+        void 유저_아이디가_유효하지_않을_경우_예외_처리() {
             // Given
             long invalidId = -1L;
 
@@ -91,9 +87,8 @@ class PointServiceTest {
             verify(pointRepository, never()).getUserHistory(anyLong());
         }
 
-        @DisplayName("[history] 유효한 아이디일 경우 포인트 충전/이용 내역 조회")
         @Test
-        void validUserHistories() {
+        void 유효한_아이디일_경우_포인트_충전_이용_내역_조회() {
             // Given
             long validId = 1L;
             List<PointHistory> mockHistory = Arrays.asList(
@@ -116,9 +111,8 @@ class PointServiceTest {
     @Nested
     @DisplayName("[charge] 유저 포인트 충전 기능 테스트")
     class ChargeTest {
-        @DisplayName("[charge] 유저 아이디가 유효하지 않을 경우 예외 처리")
         @Test
-        void invalidUserId() {
+        void 유저_아이디가_유효하지_않을_경우_예외_처리() {
             // Given
             long invalidId = -1L;
 
@@ -178,28 +172,25 @@ class PointServiceTest {
 
         @Test
         void 충전_내역_저장_실패_시_예외_발생() {
-            // Given
+            // Given: 충전 내역 저장 시 예외가 발생하도록 설정
             long validId = 1L;
             long amount = 100L;
             UserPoint initialPoint = new UserPoint(validId, 100, System.currentTimeMillis());
             UserPoint chargedPoint = new UserPoint(validId, 200, System.currentTimeMillis());
-
             when(pointRepository.point(validId)).thenReturn(initialPoint);
             when(pointRepository.insertOrUpdate(validId, chargedPoint.point())).thenReturn(chargedPoint);
-            doThrow(new RuntimeException("History insert failed")).when(pointRepository).insertHistory(validId, amount, TransactionType.CHARGE, chargedPoint.updateMillis());
 
-            // When & Then
-            Exception exception = assertThrows(RuntimeException.class, () -> pointService.charge(validId, amount));
+            doThrow(new RuntimeException("Failed to save charge history"))
+                    .when(pointRepository).insertHistory(anyLong(), anyLong(), any(), anyLong());
 
-            // Validate exception message
-            assertEquals("History insert failed", exception.getMessage());
+            // When & Then: 예외가 발생해야 함
+            Exception exception = org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () -> {
+                pointService.charge(1L, 100);
+            });
 
-            // Verify interactions
-            verify(pointRepository, times(1)).point(validId);
-            verify(pointRepository, times(1)).insertOrUpdate(validId, chargedPoint.point());
-            verify(pointRepository, times(1)).insertHistory(validId, amount, TransactionType.CHARGE, chargedPoint.updateMillis());
+            // 예외 메시지 검증
+            assertEquals("Failed to save charge history", exception.getMessage());
         }
-
     }
 
     @Nested

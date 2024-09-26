@@ -6,7 +6,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Function;
 
 @Service
 public class PointService {
@@ -15,7 +19,7 @@ public class PointService {
 
     private final PointRepository pointRepository;
 
-    private final ReentrantLock lock = new ReentrantLock();
+    private final Map<Long, Lock> locks = new ConcurrentHashMap<>();
 
     public PointService(PointRepository pointRepository) {
         this.pointRepository = pointRepository;
@@ -49,40 +53,44 @@ public class PointService {
         return pointRepository.getUserHistory(id);
     }
 
-    /**
-     * 유저 포인트 충전 기능
-     * @param id
-     * @param amount
-     * @return
-     */
     public UserPoint charge(long id, long amount) {
-        if (id <= 0) {
-            throw new InvalidUserIdException("Invalid user ID: " + id);
-        }
-        final UserPoint point = pointRepository.point(id);
-        final UserPoint chargedPoint = point.charge(amount);
-        final UserPoint updatedUserPoint = pointRepository.insertOrUpdate(id, chargedPoint.point());
-        pointRepository.insertHistory(id, amount, TransactionType.CHARGE, updatedUserPoint.updateMillis());
-        return updatedUserPoint;
+        return process(id, amount, (point) -> {
+            final UserPoint chargedPoint = point.charge(amount);
+            pointRepository.insertHistory(id, amount, TransactionType.CHARGE, chargedPoint.updateMillis());
+            return chargedPoint;
+        });
     }
 
-    /**
-     * 유저 포인트 사용 기능
-     * @param id
-     * @param amount
-     * @return
-     */
     public UserPoint use(long id, long amount) {
+        return process(id, amount, (point) -> {
+            final UserPoint usedPoint = point.use(amount);
+            if (usedPoint.point() < 0) {
+                throw new IllegalStateException("Insufficient points");
+            }
+            pointRepository.insertHistory(id, amount, TransactionType.USE, usedPoint.updateMillis());
+            return usedPoint;
+        });
+    }
 
+    private UserPoint process(long id, long amount, Function<UserPoint, UserPoint> operation) {
         if (id <= 0) {
             throw new InvalidUserIdException("Invalid user ID: " + id);
         }
-        final UserPoint point = pointRepository.point(id);
-        final UserPoint usedPoint = point.use(amount);
-        UserPoint updatedPoint = pointRepository.insertOrUpdate(id, usedPoint.point());
-        pointRepository.insertHistory(id, amount, TransactionType.USE, updatedPoint.updateMillis());
-        return updatedPoint;
 
+        final Lock lock = locks.computeIfAbsent(id, userId -> new ReentrantLock(true));
+        lock.lock();
+
+        try {
+            final UserPoint point = pointRepository.point(id);
+            if (point == null) {
+                throw new IllegalStateException("User point not found");
+            }
+
+            UserPoint updatedPoint = operation.apply(point);
+            return pointRepository.insertOrUpdate(id, updatedPoint.point());
+        } finally {
+            lock.unlock();
+        }
     }
 
 }
