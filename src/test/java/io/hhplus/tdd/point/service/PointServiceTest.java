@@ -38,9 +38,8 @@ class PointServiceTest {
     @Nested
     @DisplayName("[point] 유저 포인트 조회 테스트")
     class PointTest {
-        @DisplayName("유저 아이디가 유효하지 않을 경우 예외 처리")
         @Test
-        void invalidUserId() {
+        void 유저_아이디가_유효하지_않을_경우_예외_처리() {
             // Given
             long invalidId = -1L;
 
@@ -53,9 +52,8 @@ class PointServiceTest {
             verify(pointRepository, never()).point(anyLong());
         }
 
-        @DisplayName("정상적인 유저 아이디로 포인트 조회")
         @Test
-        void validUserId() {
+        void 정상적인_유저_아이디로_포인트_조회() {
             // Given
             long validId = 1L;
             UserPoint point = new UserPoint(validId, 0, System.currentTimeMillis());
@@ -76,9 +74,8 @@ class PointServiceTest {
     @Nested
     @DisplayName("[history] 유저 포인트 충전/이용 내역 조회 테스트")
     class HistoryTest {
-        @DisplayName("[history] 유저 아이디가 유효하지 않을 경우 예외 처리")
         @Test
-        void invalidUserId() {
+        void 유저_아이디가_유효하지_않을_경우_예외_처리() {
             // Given
             long invalidId = -1L;
 
@@ -91,9 +88,8 @@ class PointServiceTest {
             verify(pointRepository, never()).getUserHistory(anyLong());
         }
 
-        @DisplayName("[history] 유효한 아이디일 경우 포인트 충전/이용 내역 조회")
         @Test
-        void validUserHistories() {
+        void 유효한_아이디일_경우_포인트_충전_이용_내역_조회() {
             // Given
             long validId = 1L;
             List<PointHistory> mockHistory = Arrays.asList(
@@ -116,9 +112,8 @@ class PointServiceTest {
     @Nested
     @DisplayName("[charge] 유저 포인트 충전 기능 테스트")
     class ChargeTest {
-        @DisplayName("[charge] 유저 아이디가 유효하지 않을 경우 예외 처리")
         @Test
-        void invalidUserId() {
+        void 유저_아이디가_유효하지_않을_경우_예외_처리() {
             // Given
             long invalidId = -1L;
 
